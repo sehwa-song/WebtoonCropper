@@ -32,7 +32,7 @@ public class WebtoonCropper {
     /** 에피소드를 구성하는 이미지 파일들을 순서대로 이어붙여 컷 단위로 잘라 저장하고, 저장된 컷 수를 반환한다. */
     public int cropEpisode(List<Path> imageFiles, Path outputDir) throws IOException {
         List<Mat> pages = new ArrayList<>();
-        List<FileSpan> fileSpans = new ArrayList<>();
+        List<FileSpan> fileSpans = new ArrayList<>(); // 원본 출처 기억하기 (예: 01번 파일은 0~2000 픽셀까지)
         int cumulativeRows = 0;
 
         for (Path file : imageFiles) {
@@ -51,14 +51,14 @@ public class WebtoonCropper {
         }
 
         Mat fullStrip = new Mat();
-        Core.vconcat(pages, fullStrip);
+        Core.vconcat(pages, fullStrip); // 이미지 리스트(pages)를 세로 방향으로 붙여서 fullstripi이라는 Mat행렬로 만들어.
 
-        List<Integer> cuts = gapFinder.findCutPoints(fullStrip, classifier);
+        List<Integer> cuts = gapFinder.findCutPoints(fullStrip, classifier); // 자를 위치 리스트 뽑아오기.
 
         List<Integer> boundaries = new ArrayList<>();
-        boundaries.add(0);
-        boundaries.addAll(cuts);
-        boundaries.add(fullStrip.rows());
+        boundaries.add(0);  // 검증 없이 강제 추가 (웹툰의 맨 첫 장면)
+        boundaries.addAll(cuts);    // GapFinder가 간격 보장한 컷들
+        boundaries.add(fullStrip.rows());   // 검증 없이 강제 추가 (맨 마지막 장면이 잘려나가지 않기 위함)
         boundaries = mergeSmallSegments(boundaries);
 
         Files.createDirectories(outputDir);
@@ -99,13 +99,13 @@ public class WebtoonCropper {
             int height = result.get(i + 1) - result.get(i);
             if (height >= minPanelHeight) {
                 i++;
-                continue;
+                continue;   // 인접한 두 경계 사이 간격이 충분히 크면 넘어감.
             }
             if (i == result.size() - 2) {
-                result.remove(i); // 마지막 자투리는 바로 앞 컷에 흡수
-                i = Math.max(i - 1, 0);
+                result.remove(i); // 마지막 자투리가 작으면 바로 앞 컷에 흡수
+                i = Math.max(i - 1, 0); // 합쳐진 구간도 다시 검사
             } else {
-                result.remove(i + 1); // 다음 컷과 합쳐서 흡수
+                result.remove(i + 1); // 그 외의 경우는 다음 컷과 합쳐서 흡수
             }
         }
         return result;
